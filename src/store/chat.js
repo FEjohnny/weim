@@ -14,7 +14,7 @@ export default {
             openId: 'aLVPpjqs9Bhvzwcj5A-vTYAX3GLc', // 用户openId
             wxName: '买家01', // 用户微信名称
             logo: 'https://www.jobchat.cn/static/home/images/icon_custom_default.png', // 用户头像
-            shopId: 13 // 店铺id  16
+            mallId: 13 // 店铺id  16
         },
         loginInfo: { // 会话双方的信息和token信息
             SdkAppId: '', // 用户所属应用id,必填
@@ -91,9 +91,9 @@ export default {
         // 获取会话双方的identifier和token信息
         getIdentifierToken({ commit, state }) {
             return new Promise((resolve, reject) => {
-                const { openId, shopId, unionId } = state.wxInfo;
+                const { openId, mallId, unionId } = state.wxInfo;
                 Vue.http.post(config.REQUEST_IDENTIFIER_TOKEN, {
-                    openId, shopId, unionId
+                    openId, mallId, unionId
                 }).then((loginInfo) => {
                     // 更新会话双方的信息和token信息
                     commit(types.UPDATE_LOGIN_INFO, loginInfo);
@@ -404,6 +404,7 @@ export default {
                             res.preId = preId;
                             res.scrollTop = true;
                         } else {
+                            res.preId = state.messagesLists[state.messagesLists.length - 1].seq;
                             res.scrollDown = true;
                         }
                         resolve(res);
@@ -416,7 +417,7 @@ export default {
 
         },
         // 上传图片
-        uploadPic({ commit, state }, { file, onProgressCallBack }) {
+        uploadPic({ state }, { file, onProgressCallBack }) {
             // 业务类型，1-发群图片，2-向好友发图片
             const businessType = webim.UPLOAD_PIC_BUSSINESS_TYPE.C2C_MSG;
             // 封装上传图片请求
@@ -439,48 +440,28 @@ export default {
         },
         // 消息已读通知
         onMsgReadedNotify(notify) {
+            console.log('收到已读通知');
             var sessMap = webim.MsgStore.sessMap()[webim.SESSION_TYPE.C2C + notify.From_Account];
-            if (sessMap) {
-                var msgs = _.clone(sessMap.msgs());
-                var rm_msgs = _.remove(msgs, function (m) {
-                    return m.time <= notify.LastReadTime
-                });
-                var unread = sessMap.unread() - rm_msgs.length;
-                unread = unread > 0 ? unread : 0;
-                //更新sess的未读数
-                sessMap.unread(unread);
-                // console.debug('更新C2C未读数:',notify.From_Account,unread);
-                //更新页面的未读数角标
-                if (unread > 0) {
-                    $("#badgeDiv_" + notify.From_Account).text(unread).show();
-                } else {
-                    $("#badgeDiv_" + notify.From_Account).val("").hide();
-                }
-            }
-        },
-        // 监听新消息(直播聊天室)事件，直播场景下必填
-        onBigGroupMsgNotify() {
-        },
-        // 监听（多终端同步）群系统消息事件，如果不需要监听，可不填
-        onGroupSystemNotifys() {
-        },
-        // 监听群资料变化事件，选填
-        onGroupInfoChangeNotify() {
-        },
-        // 监听好友系统通知事件，选填
-        onFriendSystemNotifys() {
-        },
-        // 监听资料系统（自己或好友）通知事件，选填
-        onProfileSystemNotifys() {
+            // if (sessMap) {
+            //     var msgs = _.clone(sessMap.msgs());
+            //     var rm_msgs = _.remove(msgs, function (m) {
+            //         return m.time <= notify.LastReadTime
+            //     });
+            //     var unread = sessMap.unread() - rm_msgs.length;
+            //     unread = unread > 0 ? unread : 0;
+            //     //更新sess的未读数
+            //     sessMap.unread(unread);
+            //     // console.debug('更新C2C未读数:',notify.From_Account,unread);
+            //     //更新页面的未读数角标
+            //     if (unread > 0) {
+            //         $("#badgeDiv_" + notify.From_Account).text(unread).show();
+            //     } else {
+            //         $("#badgeDiv_" + notify.From_Account).val("").hide();
+            //     }
+            // }
         },
         // 被其他登录实例踢下线
         onKickedEventCall() {
-        },
-        // 监听C2C系统消息通道
-        onC2cEventNotifys() {
-        },
-        // 申请文件/音频下载地址的回调
-        onAppliedDownloadUrl() {
         }
     }
 };

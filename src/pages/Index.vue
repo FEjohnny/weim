@@ -1,7 +1,10 @@
 <template>
     <div class="chat-container">
         <!--展示消息-->
-        <div class="messages-wrap" ref="scrollContainer" @click="handleFocus">
+        <div class="messages-wrap"
+             :class="{'dialog-open': showEmoticon || showMedia}"
+             ref="scrollContainer"
+             @click="handleFocus">
             <mt-loadmore
                 :top-method="getHistoryMessages"
                 :top-all-loaded="allLoaded"
@@ -20,7 +23,7 @@
                 <!--上传图片进度条start-->
                 <div class="upload-progress" v-if="uploadOptions.size > 0">
                     <div class="progress" :style="{width:uploadOptions.progress}"></div>
-                    <span :style="{left:uploadOptions.progress}">图片上传中</span>
+                    <span>图片上传中</span>
                 </div>
                 <!--上传图片进度条end-->
                 <!--下拉加载状态start-->
@@ -135,25 +138,28 @@
         },
         created() {
             const vm = this;
-            // 获取用户信息，并登陆腾旭IM聊天服务器
+            // 获取用户信息
             this.getIdentifierToken().then(() => {
+                // 并登陆腾旭IM聊天服务器
                 vm.loginIm({
                     onConnNotify: vm.onConnNotify,
                     jsonpCallback: vm.jsonpCallback,
                     onMsgNotify: vm.onMessageNotify,
-                    onBigGroupMsgNotify: vm.onBigGroupMsgNotify,
-                    onGroupSystemNotifys: vm.onGroupSystemNotifys,
-                    onGroupInfoChangeNotify: vm.onGroupInfoChangeNotify,
-                    onFriendSystemNotifys: vm.onFriendSystemNotifys,
-                    onProfileSystemNotifys: vm.onProfileSystemNotifys,
                     onKickedEventCall: vm.onKickedEventCall,
-                    onC2cEventNotifys: vm.onC2cEventNotifys,
-                    onAppliedDownloadUrl: vm.onAppliedDownloadUrl
+                    onC2cEventNotifys: { // 监听C2C系统消息通道
+                        '92': vm.onMsgReadedNotify, // 消息已读通知,
+                        '96': null
+                    }
                 }).then(() => {
+                    // 获取历史消息
                     vm.getHistoryMessages();
+                }).catch((err) => {
+                    alert(`登录IM服务器失败：${err.ErrorInfo}`);
                 });
+            }).catch((err) => {
+                alert(`获取token失败：${err.ErrorInfo}`);
             });
-            // 解析表情
+            // 解析表情元素
             const _tempEmotions = [];
             const EACHPAGEMAX = 23; // 每页最多显示的表情数24
             let _emotions = [];
@@ -189,33 +195,28 @@
             ...mapActions('chat', [
                 'getIdentifierToken',
                 'loginIm',
+                'onConnNotify',
+                'jsonpCallback',
+                'onMsgNotify',
                 'sendMessage',
                 'sendPicMessage',
                 'getLastC2CHistoryMsgs',
                 'uploadPic',
-                'onConnNotify',
-                'jsonpCallback',
-                'onMsgNotify',
-                'onBigGroupMsgNotify',
-                'onGroupSystemNotifys',
-                'onGroupInfoChangeNotify',
-                'onFriendSystemNotifys',
-                'onProfileSystemNotifys',
+                'onMsgReadedNotify',
                 'onKickedEventCall',
-                'onC2cEventNotifys',
-                'onAppliedDownloadUrl'
             ]),
             // 监听新消息
             onMessageNotify(newMsgList) {
                 this.onMsgNotify(newMsgList);
                 setTimeout(() => {
-                    document.documentElement.scrollTop = 9999999;
-                    document.body.scrollTop = 9999999;
-                }, 300);
+                    this.scrollTopBottom();
+                }, 100);
             },
             onProgressCallBack(uploadedSize) {
                 this.uploadOptions.uploadedSize = uploadedSize;
                 this.uploadOptions.progress = `${(uploadedSize / this.uploadOptions.size) * 100}%`;
+                console.log(this.uploadOptions.size);
+                console.log(this.uploadOptions.uploadedSize);
             },
             // 上传照片
             uploadChange(e) {
@@ -224,8 +225,8 @@
                 console.log(file);
                 if (!file) {
                     return;
-                } else if (file.size > 1024 * 1024) { // 图片不能大于1M
-                    alert('图片大小不能大于1M');
+                } else if (file.size > 5 * 1024 * 1024) { // 图片不能大于1M
+                    alert('图片大小不能大于5M');
                     return;
                 }
                 this.showMedia = false;
@@ -244,12 +245,15 @@
                     };
                     _this.sendPicMessage(res);
                     setTimeout(() => {
-                        document.documentElement.scrollTop = 9999999;
-                        document.body.scrollTop = 9999999;
+                        _this.scrollTopBottom();
                     }, 300);
                 }).catch((err) => {
-                    alert('图片上传失败');
-                    console.log(err.ErrorInfo);
+                    alert(`图片上传失败:${err.ErrorInfo}`);
+                    _this.uploadOptions = {
+                        size: 0,
+                        uploadedSize: 0,
+                        progress: 0
+                    };
                 });
             },
             // 添加表情
@@ -276,17 +280,23 @@
                 this.message = ''; // 清空聊天输入框
                 this.sendMessage({ message: msg });
                 setTimeout(() => {
-                    document.documentElement.scrollTop = 9999999;
-                    document.body.scrollTop = 9999999;
+                    this.scrollTopBottom();
                 }, 300);
+            },
+            // 滚动到页面底部通用方法
+            scrollTopBottom() {
+                document.documentElement.scrollTop = 9999999;
+                document.body.scrollTop = 9999999;
             },
             // 显示或者收起表情
             toggleEmoticon() {
+                this.scrollTopBottom();
                 this.showEmoticon = !this.showEmoticon;
                 this.showMedia = false;
             },
             // 显示或者收起发送文件
             toggleMedia() {
+                this.scrollTopBottom();
                 this.showMedia = !this.showMedia;
                 this.showEmoticon = false;
             },
@@ -314,19 +324,13 @@
                         if (res.scrollTop && res.preId) { // 拉去历史记录后，保持滚动条的位置
                             preEle = document.getElementById(res.preId);
                             scrollTop = preEle.offsetTop - ((Number(document.documentElement.style.fontSize.replace('px', '')) / 75) * 32);
-                            setTimeout(() => {
-                                document.documentElement.scrollTop = scrollTop;
-                                document.body.scrollTop = scrollTop;
-                            }, 300);
-                        } else if (res.scrollDown) { // 首次历史消息，滚到底部
-                            setTimeout(() => {
-                                document.documentElement.scrollTop = 9999999;
-                                document.body.scrollTop = 9999999;
-                            }, 300);
+                            document.documentElement.scrollTop = scrollTop;
+                            document.body.scrollTop = scrollTop;
+                        } else if (res.scrollDown && res.preId) { // 首次历史消息，滚到底部
+                            _this.scrollTopBottom();
                         }
                     }).catch((err) => {
-                        console.log('拉取历史消息出错');
-                        console.log(err);
+                        console.log(`拉取历史消息出错:${err.ErrorInfo}`);
                     });
                 } else {
                     this.$refs.loadmore.onTopLoaded();
@@ -343,6 +347,9 @@
     .chat-container {
         .messages-wrap{
             padding-bottom: 132px;
+            &.dialog-open{
+                padding-bottom: 492px;
+            }
         }
         .footer {
             position: fixed;
@@ -522,6 +529,7 @@
             font-size: 12px;
             line-height: 1em;
             top: -1em;
+            left: 0;
         }
     }
 </style>

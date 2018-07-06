@@ -101,8 +101,21 @@
                 if (!oriImage) {
                     oriImage = smallImage;
                 }
+                // 计算图片大小
+                const imgW = smallImage.getWidth() || oriImage.getWidth();
+                const imgH = smallImage.getHeight() || oriImage.getHeight();
+                let showW;
+                let showH;
+                if (imgW >= imgH) {
+                    showW = imgW > 200 ? 200 : imgW;
+                    showH = imgH * (showW / imgW);
+                } else {
+                    showH = imgH > 200 ? 200 : imgH;
+                    showW = imgW * (showH / imgH);
+                }
+                const _style = `display: block;width:${showW === 0 ? '100px' : `${showW}px`};height: ${showH === 0 ? '100px' : `${showH}px`}`;
                 return `<img src="${smallImage.getUrl()}#${bigImage.getUrl()}#${oriImage.getUrl()}"
-                        style="max-width: 100%;display: block" />`;
+                        style="${_style}" />`;
             },
             viewHdPic(url) {
                 this.imgPreviewUrl = url;
@@ -275,6 +288,7 @@
         display: flex;
         flex-direction: column;
         div{
+            text-align: center;
             img{
                 width: auto;
                 height: auto;
