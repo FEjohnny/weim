@@ -23,4 +23,13 @@ export const UPDATE_MSG_SENDING_STATUS = 'UPDATE_MSG_SENDING_STATUS';
 // 删除某条发送失败的消息
 export const DELETE_MSG_SEND_FAILED = 'DELETE_MSG_SEND_FAILED';
 
+// 上传图片状态更新,更新需要上传图片的总大小
+export const UPDATE_UPLOAD_IMG_SIZE = 'UPDATE_UPLOAD_IMG_SIZE';
+
+// 上传图片状态更新,更新已上传的大小以及百分比
+export const UPDATE_UPLOAD_IMG_UPLOADED = 'UPDATE_UPLOAD_IMG_UPLOADED';
+
+// 上传图片状态更新,预览图片地址
+export const UPDATE_UPLOAD_IMG_URL = 'UPDATE_UPLOAD_IMG_URL';
+
 export default null;

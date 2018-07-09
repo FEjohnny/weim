@@ -38,11 +38,28 @@
                    class="send-again-btn"></i>
             </div>
         </div>
+        <!--上传图片start-->
+        <div class="item own" v-if="uploadOptions.size > 0">
+            <img :src="loginInfo.headurl"
+                 onerror="this.src='https://www.jobchat.cn/static/home/images/icon_custom_default.png'"
+                 class="head" alt="头像">
+            <!--消息内容start-->
+            <div class="msg msgImg upload-item">
+                <span class="upload-state">
+                    <i>{{uploadOptions.progress}}</i>
+                    <span :style="{height:uploadOptions.progress}"></span>
+                    <img src="../../assets/img_default.jpg">
+                </span>
+            </div>
+        </div>
+        <!--上传图片end-->
+        <!--图片预览start-->
         <div class="img-preview" v-show="imgPreviewUrl" @click="hidePreview">
             <div>
                 <img :src="imgPreviewUrl" alt="">
             </div>
         </div>
+        <!--图片预览end-->
     </div>
 </template>
 
@@ -54,6 +71,7 @@
 
     export default {
         name: 'Index',
+        props: ['messagesLists'],
         data() {
             return {
                 typeImage: webim.MSG_ELEMENT_TYPE.IMAGE,
@@ -63,7 +81,7 @@
             };
         },
         computed: {
-            ...mapState('chat', ['messagesLists', 'loginInfo'])
+            ...mapState('chat', ['loginInfo', 'uploadOptions'])
         },
         methods: {
             ...mapActions('chat', ['sendMessage']),
@@ -182,6 +200,9 @@
             border-radius: 16px;
             position: relative;
             line-height: 45px;
+            &.upload-item{
+                padding: 6px;
+            }
             &:before {
                 content: '';
                 zoom: 1;
@@ -272,6 +293,46 @@
                 background: url("../../assets/icon_send_again.png") no-repeat;
                 background-size: 100% 100%;
             }
+        }
+    }
+    .upload-state{
+        font-size: 24px;
+        color: #ffffff;
+        position: relative;
+        line-height: 1em;
+        z-index: 0;
+        &:before{
+            content: '图片上传中...';
+            zoom: 1;
+            position: absolute;
+            z-index: 12;
+            left: 50%;
+            top: 40%;
+            transform: translate(-50%,-50%);
+        }
+        i{
+            position: absolute;
+            z-index: 12;
+            left: 50%;
+            top: 50%;
+            font-style: normal;
+            transform: translate(-50%,-50%);
+        }
+        span{
+            content: '';
+            zoom: 1;
+            position: absolute;
+            left: 0;
+            height: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,.7);
+            z-index: 11;
+        }
+        img{
+            width: 300px;
+            height: auto;
+            min-height: 200px;
         }
     }
     .img-preview{

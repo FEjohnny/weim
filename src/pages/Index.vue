@@ -2,7 +2,6 @@
     <div class="chat-container">
         <!--展示消息-->
         <div class="messages-wrap"
-             :class="{'dialog-open': showEmoticon || showMedia}"
              ref="scrollContainer"
              @click="handleFocus">
             <mt-loadmore
@@ -10,31 +9,23 @@
                 :top-all-loaded="allLoaded"
                 :topDistance="50"
                 :maxDistance="70"
+                class="loadmore-wrapper"
+                :class="{'dialog-open': showEmoticon || showMedia}"
                 @top-status-change="handleTopChange"
                 ref="loadmore">
                 <!--查看更多历史记录按钮，从腾讯IM加载不到消息就显示这个按钮-->
                 <router-link
-                     v-if="allLoaded"
+                     v-if="messagesLists.length > 0 && allLoaded"
                      to="/history"
                      class="more-messages">查看更多历史记录</router-link>
                 <!--消息start-->
-                <Message></Message>
+                <Message :messagesLists="messagesLists"></Message>
                 <!--消息end-->
-                <!--上传图片进度条start-->
-                <div class="upload-progress" v-if="uploadOptions.size > 0">
-                    <div class="progress" :style="{width:uploadOptions.progress}"></div>
-                    <span>图片上传中</span>
-                </div>
-                <!--上传图片进度条end-->
                 <!--下拉加载状态start-->
                 <div slot="top" class="mint-loadmore-top">
                     <div v-if="!allLoaded">
-                        <span v-show="topStatus != 'loading'">
-                            <span class="icon_down"
-                                  :class="{icon_rotate: topStatus === 'drop' }">↓</span>
-                            <span v-show="topStatus === 'pull'">查看更多消息</span>
-                            <span v-show="topStatus === 'drop'">释放查看更多</span>
-                        </span>
+                        <span v-show="topStatus === 'pull'">↓查看更多消息</span>
+                        <span v-show="topStatus === 'drop'">↑释放查看更多</span>
                         <span v-show="topStatus === 'loading'">加载中...</span>
                     </div>
                     <div v-else>
@@ -104,6 +95,8 @@
             </div>
             <!--发送图片end-->
         </div>
+        <!--加载中-->
+        <LoadingPage v-if="loadingText" :loadingText="loadingText"></LoadingPage>
     </div>
 </template>
 
@@ -111,6 +104,7 @@
     import { mapState, mapActions } from 'vuex';
     import { swiper, swiperSlide } from 'vue-awesome-swiper';
     import Message from '@/components/message';
+    import LoadingPage from '@/components/LoadingPage';
     import emotionJson from '../emotions/name_to_face_normal';
 
     export default {
@@ -129,16 +123,13 @@
                 topStatus: '',
                 allLoaded: false,
                 emotions: [], // 所有表情，每一个元素的格式：['[微笑]', 011]
-                uploadOptions: { // 上传图片参数
-                    size: 0, // 总大小
-                    uploadedSize: 0, // 已上传大小
-                    progress: 0 // 上传进度“10%”
-                }
+                loadingText: '' // 加载状态文字
             };
         },
         created() {
             const vm = this;
             // 获取用户信息
+            this.loadingText = '连接客服中...';
             this.getIdentifierToken().then(() => {
                 // 并登陆腾旭IM聊天服务器
                 vm.loginIm({
@@ -152,11 +143,14 @@
                     }
                 }).then(() => {
                     // 获取历史消息
+                    this.loadingText = '获取历史聊天记录中...';
                     vm.getHistoryMessages();
                 }).catch((err) => {
+                    this.loadingText = '登录失败';
                     alert(`登录IM服务器失败：${err.ErrorInfo}`);
                 });
             }).catch((err) => {
+                this.loadingText = '获取token失败';
                 alert(`获取token失败：${err.ErrorInfo}`);
             });
             // 解析表情元素
@@ -178,12 +172,9 @@
             });
             this.emotions = _tempEmotions;
         },
-        mounted() {
-            console.log('登录之后获取到的信息');
-            console.log(this.loginInfo);
-        },
+        mounted() {},
         components: {
-            swiper, swiperSlide, Message
+            swiper, swiperSlide, Message, LoadingPage
         },
         computed: {
             ...mapState('chat', ['loginInfo', 'wxInfo', 'messagesLists']),
@@ -202,8 +193,10 @@
                 'sendPicMessage',
                 'getLastC2CHistoryMsgs',
                 'uploadPic',
+                'onProgressCallBack',
+                'resetUploadOptions',
                 'onMsgReadedNotify',
-                'onKickedEventCall',
+                'onKickedEventCall'
             ]),
             // 监听新消息
             onMessageNotify(newMsgList) {
@@ -212,12 +205,6 @@
                     this.scrollTopBottom();
                 }, 100);
             },
-            onProgressCallBack(uploadedSize) {
-                this.uploadOptions.uploadedSize = uploadedSize;
-                this.uploadOptions.progress = `${(uploadedSize / this.uploadOptions.size) * 100}%`;
-                console.log(this.uploadOptions.size);
-                console.log(this.uploadOptions.uploadedSize);
-            },
             // 上传照片
             uploadChange(e) {
                 const _this = this;
@@ -225,35 +212,28 @@
                 console.log(file);
                 if (!file) {
                     return;
-                } else if (file.size > 5 * 1024 * 1024) { // 图片不能大于1M
+                } else if (!/image.(png|jpg|jpeg|bmp)/.test(file.type)) {
+                    alert('图片格式错误');
+                    return;
+                } else if (file.size > 10 * 1024 * 1024) { // 图片不能大于1M
                     alert('图片大小不能大于5M');
                     return;
                 }
                 this.showMedia = false;
                 this.showEmoticon = false;
-                this.uploadOptions.size = file.size;
                 this.uploadPic({
                     file: file,
                     onProgressCallBack: _this.onProgressCallBack
                 }).then((res) => {
                     // 上传成功，发送图片
                     console.log('图片上传成功');
-                    _this.uploadOptions = {
-                        size: 0,
-                        uploadedSize: 0,
-                        progress: 0
-                    };
                     _this.sendPicMessage(res);
                     setTimeout(() => {
                         _this.scrollTopBottom();
                     }, 300);
                 }).catch((err) => {
                     alert(`图片上传失败:${err.ErrorInfo}`);
-                    _this.uploadOptions = {
-                        size: 0,
-                        uploadedSize: 0,
-                        progress: 0
-                    };
+                    _this.resetUploadOptions();
                 });
             },
             // 添加表情
@@ -312,6 +292,7 @@
                 if (!_this.allLoaded) {
                     this.getLastC2CHistoryMsgs().then((res) => {
                         // 是否还有历史消息可以拉取，1-表示没有，0-表示有
+                        this.loadingText = '';
                         const complete = res.Complete;
                         // 返回的消息条数，小于或等于请求的消息条数，小于的时候，说明没有历史消息可拉取了
                         // const retMsgCount = res.MsgCount;
@@ -333,6 +314,7 @@
                         console.log(`拉取历史消息出错:${err.ErrorInfo}`);
                     });
                 } else {
+                    this.loadingText = '';
                     this.$refs.loadmore.onTopLoaded();
                 }
             },
@@ -345,7 +327,7 @@
 
 <style lang="less" scoped>
     .chat-container {
-        .messages-wrap{
+        .loadmore-wrapper{
             padding-bottom: 132px;
             &.dialog-open{
                 padding-bottom: 492px;
@@ -361,6 +343,7 @@
                 padding: 14px 144px 14px 156px;
                 position: relative;
                 box-sizing: border-box;
+                z-index: 100;
                 .message-wrapper {
                     position: relative;
                     .message-input, span {
@@ -508,28 +491,6 @@
                     height: 38px!important;
                 }
             }
-        }
-    }
-    .upload-progress{
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 100px;
-        height: 8px;
-        background: #e5e5e5;
-        .progress{
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            background: #008AFF;
-        }
-        span{
-            position: absolute;
-            font-size: 12px;
-            line-height: 1em;
-            top: -1em;
-            left: 0;
         }
     }
 </style>

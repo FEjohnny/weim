@@ -10,11 +10,9 @@ export default {
         accountMode: 0, // 帐号模式，0-表示独立模式，1-表示托管模式
         // todo
         wxInfo: { // 用户从商场进入聊天页带过来的信息
-            unionId: 'oTBn-at2RQSHdBoJQYFSdnZo8BBQ', // 用户unionID
-            openId: 'aLVPpjqs9Bhvzwcj5A-vTYAX3GLc', // 用户openId
-            wxName: '买家01', // 用户微信名称
-            logo: 'https://www.jobchat.cn/static/home/images/icon_custom_default.png', // 用户头像
-            mallId: 13 // 店铺id  16
+            // unionId: 'oTBn-at2RQSHdBoJQYFSdnZo8BBQ', // 用户unionID
+            openId: 'okmGDuIEV-HYe0uF_xD4SoQLoomc', // 用户openId
+            mallId: '5a0059671e663f7fef78683f' // 店铺id  5b39c3261e663f47311e30e1
         },
         loginInfo: { // 会话双方的信息和token信息
             SdkAppId: '', // 用户所属应用id,必填
@@ -30,11 +28,19 @@ export default {
             refresh_token_expire_in: '' // 刷新token过期时间
         },
         messagesLists: [], // 消息数组，结构为[Msg]
+        historyMessagesLists: [], // 消息数组，结构为[Msg]
         lastedShowTime: '', // 保存最新消息的展示时间
         // 用于下次向前拉取历史消息
         lastMsg: {
             time: 0, // 最前一条消息的时间，，第一次拉取好友历史消息时，必须传 0
             key: '' // 最前一条消息的消息Key，用于下次向前拉取历史消息
+        },
+        // 上传图片参数
+        uploadOptions: {
+            size: 0, // 总大小
+            uploadedSize: 0, // 已上传大小
+            progress: 0, // 上传进度“10%”
+            url: '' // 图片本地预览地址
         }
     },
     gettter: {},
@@ -55,6 +61,7 @@ export default {
             // payload数组是最新的消息在最后面
             const msg = timeFormate.historyMsgTimeFormate(payload);
             state.messagesLists = msg.concat(state.messagesLists);
+            state.historyMessagesLists = msg.concat(state.historyMessagesLists);
         },
         // 往消息列表新增一条消息
         [types.PUSH_NEW_MESSAGE_INTO_LISTS](state, payload) {
@@ -63,6 +70,7 @@ export default {
             msg.showTime = res.showTime;
             state.lastedShowTime = res.lastedShowTime;
             state.messagesLists.push(msg);
+            state.historyMessagesLists.push(msg);
         },
         // 更新最前一条消息的时间和key信息
         [types.UPDATE_LAST_MESSAGE_TIME_KEY](state, payload) {
@@ -85,18 +93,34 @@ export default {
                     break;
                 }
             }
-        }
+        },
+        // 上传图片状态size更新
+        [types.UPDATE_UPLOAD_IMG_SIZE](state, payload) {
+            state.uploadOptions.size = payload;
+        },
+        // 上传图片状态更新已上传的大小以及百分比
+        [types.UPDATE_UPLOAD_IMG_UPLOADED](state, payload) {
+            const options = payload;
+            options.size = state.uploadOptions.size;
+            state.uploadOptions = options;
+        },
+        // 上传图片，更新预览图片地址
+        [types.UPDATE_UPLOAD_IMG_URL](state, payload) {
+            state.uploadOptions.url = payload;
+        },
     },
     actions: {
         // 获取会话双方的identifier和token信息
         getIdentifierToken({ commit, state }) {
             return new Promise((resolve, reject) => {
-                const { openId, mallId, unionId } = state.wxInfo;
+                const { openId, mallId } = state.wxInfo;
                 Vue.http.post(config.REQUEST_IDENTIFIER_TOKEN, {
-                    openId, mallId, unionId
+                    openId, mallId
                 }).then((loginInfo) => {
                     // 更新会话双方的信息和token信息
                     commit(types.UPDATE_LOGIN_INFO, loginInfo);
+                    console.log('获取会话双方的identifier和token信息');
+                    console.log(loginInfo);
                     resolve(loginInfo);
                 }).catch((error) => {
                     reject(error);
@@ -121,6 +145,7 @@ export default {
                         // 登录成功，更新用户昵称和头像
                         commit(types.UPDATE_WX_INFO, res);
                         console.log('======================IM服务器登录成功==========================');
+                        console.log(res);
                         resolve(res);
                     }, (err) => {
                         console.log('======================IM服务器登录失败==========================');
@@ -340,6 +365,11 @@ export default {
                 imagesObj.addImage(newImg);
             }
             msg.addImage(imagesObj);
+            commit(types.UPDATE_UPLOAD_IMG_SIZE, 0);
+            commit(types.UPDATE_UPLOAD_IMG_UPLOADED, {
+                uploadedSize: 0,
+                progress: 0
+            });
             // 将消息发送到自己的窗口
             const showMsg = {
                 content: msg.getElems()[0].getContent(),
@@ -404,7 +434,8 @@ export default {
                             res.preId = preId;
                             res.scrollTop = true;
                         } else {
-                            res.preId = state.messagesLists[state.messagesLists.length - 1].seq;
+                            res.preId = state.messagesLists[state.messagesLists.length - 1] ?
+                                state.messagesLists[state.messagesLists.length - 1].seq : '';
                             res.scrollDown = true;
                         }
                         resolve(res);
@@ -414,10 +445,15 @@ export default {
                     }
                 );
             });
-
         },
         // 上传图片
-        uploadPic({ state }, { file, onProgressCallBack }) {
+        uploadPic({ commit, state }, { file, onProgressCallBack }) {
+            // 图片预览，手机上性能消耗太大,暂时关闭
+            // const reader = new FileReader();
+            // reader.onload = function (evt) {
+            //     commit(types.UPDATE_UPLOAD_IMG_URL, evt.target.result);
+            // };
+            // reader.readAsDataURL(file);
             // 业务类型，1-发群图片，2-向好友发图片
             const businessType = webim.UPLOAD_PIC_BUSSINESS_TYPE.C2C_MSG;
             // 封装上传图片请求
@@ -429,13 +465,30 @@ export default {
                 To_Account: state.loginInfo.Seller_identifier, // 接收者
                 businessType: businessType // 业务类型
             };
-            return new Promise((resolve, reject) =>{
+            // 更新上传图片状态，总大小
+            commit(types.UPDATE_UPLOAD_IMG_SIZE, file.size);
+            return new Promise((resolve, reject) => {
                 // 上传图片
                 webim.uploadPic(opt, (resp) => {
                     resolve(resp);
                 }, (err) => {
                     reject(err);
                 });
+            });
+        },
+        // 上传图片进度回调函数
+        onProgressCallBack({ commit, state }, uploadedSize) {
+            commit(types.UPDATE_UPLOAD_IMG_UPLOADED, {
+                uploadedSize: uploadedSize,
+                progress: `${Math.floor(uploadedSize / state.uploadOptions.size) * 100}%`
+            });
+        },
+        // 重置上传状态参数
+        resetUploadOptions({ commit }) {
+            commit(types.UPDATE_UPLOAD_IMG_SIZE, 0);
+            commit(types.UPDATE_UPLOAD_IMG_UPLOADED, {
+                uploadedSize: 0,
+                progress: 0
             });
         },
         // 消息已读通知
@@ -461,7 +514,64 @@ export default {
             // }
         },
         // 被其他登录实例踢下线
-        onKickedEventCall() {
+        onKickedEventCall({ commit }) {
+            const confirm = window.confirm('您的账号在其他地方登陆，您已被迫下线,是否立即重新登陆');
+            if (confirm) {
+                location.reload();
+            }
+        },
+        // 获取7天以外的聊天记录
+        getHistoryMessagesFromIdouzi({ commit, state}) {
+            const options = {
+                Peer_Account: state.loginInfo.Seller_identifier, // 好友帐号
+                MaxCnt: config.REQUEST_MSG_COUNT, // 拉取消息条数
+                LastMsgTime: state.lastMsg.time, // 最近的消息时间，即从这个时间点向前拉取历史消息
+                MsgKey: state.lastMsg.key
+            };
+            return new Promise((resolve, reject) => {
+                webim.getC2CHistoryMsgs(
+                    options,
+                    (resp) => {
+                        console.log('获取到的历史消息');
+                        console.log(resp);
+                        const res = resp;
+                        const preId = state.messagesLists[0] ? state.messagesLists[0].seq : ''; // 获取当前最后一条消息的标识，用于加载消息后重新定位滚动条
+                        if (res.MsgList.length > 0) {
+                            // 保留服务器返回的最近消息时间和消息Key,用于下次向前拉取历史消息
+                            commit(types.UPDATE_LAST_MESSAGE_TIME_KEY, {
+                                time: res.LastMsgTime,
+                                key: res.MsgKey
+                            });
+                            // 解析消息
+                            const _temp = [];
+                            res.MsgList.forEach((msg) => {
+                                // 把解析的消息更新到消息列表中
+                                _temp.push({
+                                    content: msg.getElems()[0].getContent(), // 解析消息
+                                    isSend: msg.getIsSend(), // 是否是自己发的消息
+                                    time: msg.getTime(), // 消息发送的时间
+                                    showTime: '', // 格式化后的展示时间
+                                    seq: msg.getSeq(), // 标识该消息
+                                    type: msg.getElems()[0].getType() // 消息类型
+                                });
+                            });
+                            commit(types.APPEND_HISTORY_MESSAGES_INTO_LISTS, _temp);
+                        }
+                        if (preId) {
+                            res.preId = preId;
+                            res.scrollTop = true;
+                        } else {
+                            res.preId = state.messagesLists[state.messagesLists.length - 1] ?
+                                state.messagesLists[state.messagesLists.length - 1].seq : '';
+                            res.scrollDown = true;
+                        }
+                        resolve(res);
+                    },
+                    (error) => {
+                        reject(error);
+                    }
+                );
+            });
         }
     }
 };
