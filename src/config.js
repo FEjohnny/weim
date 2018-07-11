@@ -22,3 +22,6 @@ export const BASE_URL = 'http://dev.dlgim.jobchat.cn/api/';
 // 获取会话双方的identifier和token信息(post)
 export const REQUEST_IDENTIFIER_TOKEN = 'startc2c';
 
+// 从自己服务器获取聊天记录
+export const REQUEST_HISTORY_MSG = 'getmsghistory';
+

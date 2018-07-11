@@ -1,18 +1,22 @@
 import Vue from 'vue';
-import webim from '../imLibs/webim';
+import webim from '@/imLibs/webim';
 import * as config from '../config';
 import * as types from './mutation-types';
-import * as timeFormate from '../util/timeFormate';
+import * as timeFormate from '@/util/timeFormate';
+import msgFormate from '@/util/msgFormate';
 
 export default {
     namespaced: true,
     state: {
         accountMode: 0, // 帐号模式，0-表示独立模式，1-表示托管模式
-        // todo
         wxInfo: { // 用户从商场进入聊天页带过来的信息
-            // unionId: 'oTBn-at2RQSHdBoJQYFSdnZo8BBQ', // 用户unionID
-            openId: 'okmGDuIEV-HYe0uF_xD4SoQLoomc', // 用户openId
-            mallId: '5a0059671e663f7fef78683f' // 店铺id  5b39c3261e663f47311e30e1
+            openId: '', // 用户openId
+            mallId: '', // 店铺id  5b39c3261e663f47311e30e1
+            oringinUrl: '', // 来源链接
+            goodsId: '', // 商品id
+            goodsName: '', // 商品名称
+            goodsPrice: '', // 商品价格
+            goodsImageUrl: '' // 商品图片
         },
         loginInfo: { // 会话双方的信息和token信息
             SdkAppId: '', // 用户所属应用id,必填
@@ -45,6 +49,13 @@ export default {
     },
     gettter: {},
     mutations: {
+        // 设置wxinfo
+        [types.SET_WXINFO](state, payload) {
+            console.log('链接地址上的url参数');
+            console.log(payload);
+            // `openId=okmGDuIEV-HYe0uF_xD4SoQLoomc&mallId=5a0059671e663f7fef78683f&oringinUrl=http://www.baidu.com&goodsId=20&goodsName=日版冠军墨镜超级牛逼&goodsPrice=115&goodsImageUrl=http://f0.topitme.com/0/05/be/11269838091bfbe050o.jpg`
+            state.wxInfo = payload;
+        },
         // 更新会话双方的信息和token信息
         [types.UPDATE_LOGIN_INFO](state, payload) {
             state.loginInfo = payload;
@@ -54,7 +65,8 @@ export default {
             // 将空格和换行符转换成HTML标签
             state.loginInfo.identifierNick = webim.Tool.formatText2Html(payload.identifierNick) ||
                 webim.Tool.formatText2Html(payload.identifier);
-            state.loginInfo.headurl = webim.Tool.formatText2Html(payload.headurl);
+            state.loginInfo.headurl = webim.Tool.formatText2Html(payload.headurl) ||
+                'https://www.jobchat.cn/static/home/images/icon_custom_default.png';
         },
         // 拉取历史消息，unshift到消息列表中
         [types.APPEND_HISTORY_MESSAGES_INTO_LISTS](state, payload) {
@@ -108,8 +120,36 @@ export default {
         [types.UPDATE_UPLOAD_IMG_URL](state, payload) {
             state.uploadOptions.url = payload;
         },
+        // 设置商品信息
+        [types.SET_GOODS_INFO](state, payload) {
+            const goods = payload;
+            const res = timeFormate.newMsgTimeFormate(goods.time, state.lastedShowTime, 'single');
+            goods.showTime = res.showTime;
+            state.lastedShowTime = res.lastedShowTime;
+            state.messagesLists.push(goods);
+        },
+        // 拉取历史消息，unshift到历史消息列表中
+        [types.APPEND_HISTORY_MESSAGES_INTO_HISTORY_LISTS](state, payload) {
+            // payload数组是最新的消息在最后面
+            const msg = timeFormate.historyMsgTimeFormate(payload);
+            state.historyMessagesLists = msg.concat(state.historyMessagesLists);
+        }
     },
     actions: {
+        // 设置商品信息
+        setGoodsInfo({ commit, state }) {
+            commit(types.SET_GOODS_INFO, {
+                content: state.wxInfo,
+                time: new Date().getTime() / 1000,
+                showTime: '',
+                seq: '',
+                type: 'customGoods' // 消息类型
+            });
+        },
+        // setWxInfo
+        setWxInfo({ commit }, wxInfo) {
+            commit(types.SET_WXINFO, wxInfo);
+        },
         // 获取会话双方的identifier和token信息
         getIdentifierToken({ commit, state }) {
             return new Promise((resolve, reject) => {
@@ -160,18 +200,18 @@ export default {
             let info;
             switch (resp.ErrorCode) {
             case webim.CONNECTION_STATUS.ON:
-                webim.Log.warn(`建立连接成功: ${resp.ErrorInfo}`);
+                console.log(`建立连接成功: ${resp.ErrorInfo}`);
                 break;
             case webim.CONNECTION_STATUS.OFF:
                 info = `连接已断开，无法收到新消息，请检查下你的网络是否正常: ${resp.ErrorInfo}`;
-                webim.Log.warn(info);
+                console.log(info);
                 break;
             case webim.CONNECTION_STATUS.RECONNECT:
                 info = `连接状态恢复正常: ${resp.ErrorInfo}`;
-                webim.Log.warn(info);
+                console.log(info);
                 break;
             default:
-                webim.Log.error(`未知连接状态: = ${resp.ErrorInfo}`);
+                console.log(`未知连接状态: = ${resp.ErrorInfo}`);
                 break;
             }
         },
@@ -393,6 +433,57 @@ export default {
                 commit(types.UPDATE_MSG_SENDING_STATUS, showMsg);
             });
         },
+        // 发送商品消息
+        sendGoodsMsg({ commit, state }) {
+            if (!state.loginInfo.Seller_identifier) {
+                alert('你还没有选中好友或者群组，暂不能聊天');
+                return;
+            }
+            const selType = 'C2C';
+            const selSess = new webim.Session(
+                selType, // 会话类型， 包括群聊和私聊，具体参考webim.SESSION_TYPE常量对象，必填
+                state.loginInfo.Seller_identifier, // 对方id , 群聊时，为群id；私聊时，对方帐号，必填
+                state.loginInfo.Seller_name, // 对方名称，群聊时，为群名称；私聊时，为对方昵称，暂未使用，选填
+                '', // 对方头像url，暂未使用，选填
+                Math.round(new Date().getTime() / 1000) // 当前会话中的最新消息的时间戳，unix timestamp格式，暂未使用，选填
+            );
+            const msg = new webim.Msg(selSess, true);
+            const data = {
+                Type: 'GOODS',
+                Body: {
+                    oringinUrl: state.wxInfo.oringinUrl,
+                    goodsId: state.wxInfo.goodsId,
+                    goodsName: state.wxInfo.goodsName,
+                    goodsPrice: state.wxInfo.goodsPrice,
+                    goodsImageUrl: state.wxInfo.goodsImageUrl
+                }
+            };
+            const customObj = new webim.Msg.Elem.Custom(JSON.stringify(data), state.wxInfo.goodsName, '');
+            msg.addCustom(customObj);
+            // 将消息发送到自己的窗口
+            const showMsg = {
+                content: msg.getElems()[0].getContent(),
+                isSend: msg.getIsSend(),
+                time: msg.getTime(),
+                showTime: '',
+                seq: msg.getSeq(),
+                sending: 'sending', // 正在发送中，标识消息是否发送成功
+                type: msg.getElems()[0].getType() // 消息类型
+            };
+            commit(types.PUSH_NEW_MESSAGE_INTO_LISTS, showMsg);
+            // 调用发送消息接口
+            webim.sendMsg(msg, () => {
+                // 消息发送成功
+                showMsg.sending = 'success';
+                commit(types.UPDATE_MSG_SENDING_STATUS, showMsg);
+                webim.Tool.setCookie(`tmpmsg_${state.loginInfo.Seller_identifier}`, '', 0);
+            }, (err) => {
+                console.log(err);
+                // 消息发送失败
+                showMsg.sending = 'failed';
+                commit(types.UPDATE_MSG_SENDING_STATUS, showMsg);
+            });
+        },
         // 获取 C2C 历史消息
         getLastC2CHistoryMsgs({ commit, state }) {
             const options = {
@@ -493,8 +584,8 @@ export default {
         },
         // 消息已读通知
         onMsgReadedNotify(notify) {
-            console.log('收到已读通知');
-            var sessMap = webim.MsgStore.sessMap()[webim.SESSION_TYPE.C2C + notify.From_Account];
+            console.log(`收到已读通知${notify}`);
+            // var sessMap = webim.MsgStore.sessMap()[webim.SESSION_TYPE.C2C + notify.From_Account];
             // if (sessMap) {
             //     var msgs = _.clone(sessMap.msgs());
             //     var rm_msgs = _.remove(msgs, function (m) {
@@ -514,63 +605,72 @@ export default {
             // }
         },
         // 被其他登录实例踢下线
-        onKickedEventCall({ commit }) {
+        onKickedEventCall() {
             const confirm = window.confirm('您的账号在其他地方登陆，您已被迫下线,是否立即重新登陆');
             if (confirm) {
                 location.reload();
             }
         },
         // 获取7天以外的聊天记录
-        getHistoryMessagesFromIdouzi({ commit, state}) {
-            const options = {
-                Peer_Account: state.loginInfo.Seller_identifier, // 好友帐号
-                MaxCnt: config.REQUEST_MSG_COUNT, // 拉取消息条数
-                LastMsgTime: state.lastMsg.time, // 最近的消息时间，即从这个时间点向前拉取历史消息
-                MsgKey: state.lastMsg.key
-            };
+        getHistoryMessagesFromIdouzi({ commit, state }) {
             return new Promise((resolve, reject) => {
-                webim.getC2CHistoryMsgs(
-                    options,
-                    (resp) => {
-                        console.log('获取到的历史消息');
-                        console.log(resp);
-                        const res = resp;
-                        const preId = state.messagesLists[0] ? state.messagesLists[0].seq : ''; // 获取当前最后一条消息的标识，用于加载消息后重新定位滚动条
-                        if (res.MsgList.length > 0) {
-                            // 保留服务器返回的最近消息时间和消息Key,用于下次向前拉取历史消息
-                            commit(types.UPDATE_LAST_MESSAGE_TIME_KEY, {
-                                time: res.LastMsgTime,
-                                key: res.MsgKey
+                Vue.http.post(config.REQUEST_HISTORY_MSG, {
+                    MsgTime: state.lastMsg.time,
+                    identifier: state.loginInfo.Seller_identifier,
+                    access_token: state.loginInfo.access_token
+                }).then((resp) => {
+                    console.log('从idouzi获取到的历史消息');
+                    console.log(resp);
+                    const preId = state.historyMessagesLists[0] ? state.historyMessagesLists[0].seq : ''; // 获取当前最后一条消息的标识，用于加载消息后重新定位滚动条
+                    const res = {
+                        msgLists: []
+                    };
+                    // session
+                    const selSess = new webim.Session(
+                        'C2C', // 会话类型， 包括群聊和私聊，具体参考webim.SESSION_TYPE常量对象，必填
+                        state.loginInfo.Seller_identifier, // 对方id , 群聊时，为群id；私聊时，对方帐号，必填
+                        state.loginInfo.Seller_name, // 对方名称，群聊时，为群名称；私聊时，为对方昵称，暂未使用，选填
+                        '', // 对方头像url，暂未使用，选填
+                        Math.round(new Date().getTime() / 1000)
+                    );
+                    if (resp instanceof Array && resp.length > 0) {
+                        // 按照腾讯云解析消息格式为Msg格式
+                        res.msgLists = msgFormate(resp, selSess, state.loginInfo.identifier);
+                        console.log('解析后的消息体');
+                        console.log(res);
+                        // 保留服务器返回的最近消息时间和消息Key,用于下次向前拉取历史消息
+                        commit(types.UPDATE_LAST_MESSAGE_TIME_KEY, {
+                            time: res.msgLists[res.msgLists.length - 1].MsgTime,
+                            key: state.lastMsg.key
+                        });
+                        // 解析消息
+                        const _temp = [];
+                        res.msgLists.forEach((msg) => {
+                            // 把解析的消息更新到消息列表中
+                            _temp.push({
+                                content: msg.getElems()[0].getContent(), // 解析消息
+                                isSend: msg.getIsSend(), // 是否是自己发的消息
+                                time: msg.getTime(), // 消息发送的时间
+                                showTime: '', // 格式化后的展示时间
+                                seq: msg.getSeq(), // 标识该消息
+                                type: msg.getElems()[0].getType() // 消息类型
                             });
-                            // 解析消息
-                            const _temp = [];
-                            res.MsgList.forEach((msg) => {
-                                // 把解析的消息更新到消息列表中
-                                _temp.push({
-                                    content: msg.getElems()[0].getContent(), // 解析消息
-                                    isSend: msg.getIsSend(), // 是否是自己发的消息
-                                    time: msg.getTime(), // 消息发送的时间
-                                    showTime: '', // 格式化后的展示时间
-                                    seq: msg.getSeq(), // 标识该消息
-                                    type: msg.getElems()[0].getType() // 消息类型
-                                });
-                            });
-                            commit(types.APPEND_HISTORY_MESSAGES_INTO_LISTS, _temp);
-                        }
-                        if (preId) {
-                            res.preId = preId;
-                            res.scrollTop = true;
-                        } else {
-                            res.preId = state.messagesLists[state.messagesLists.length - 1] ?
-                                state.messagesLists[state.messagesLists.length - 1].seq : '';
-                            res.scrollDown = true;
-                        }
-                        resolve(res);
-                    },
-                    (error) => {
-                        reject(error);
+                        });
+                        commit(types.APPEND_HISTORY_MESSAGES_INTO_HISTORY_LISTS, _temp);
                     }
-                );
+                    if (preId) {
+                        res.preId = preId;
+                        res.scrollTop = true;
+                    } else {
+                        const hLen = state.historyMessagesLists.length;
+                        res.preId = state.historyMessagesLists[hLen - 1] ?
+                            state.historyMessagesLists[hLen - 1].seq : '';
+                        res.scrollDown = true;
+                    }
+                    resolve(res);
+                }).catch((error) => {
+                    reject(error);
+                });
             });
         }
     }

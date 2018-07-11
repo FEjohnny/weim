@@ -15,18 +15,29 @@ axios.interceptors.request.use((params) => {
     const timestamp = parseInt((new Date().getTime()) / 1000, 10);
     // 五位随机整数
     const nonce = parseInt(Math.random() * 100000, 10);
+    const token = _params.data.access_token || '';
     // 加密签名
-    const hashDigest = HmacSHA1(`Version=1.0&agent=wx&nonce=${nonce}&timestamp=${timestamp}`, config.PRIVATE_KEY).toString();
+    let hashDigest;
+    if (token) {
+        hashDigest = HmacSHA1(`Version=1.0&access_token=${token}&agent=wx&nonce=${nonce}&timestamp=${timestamp}`, config.PRIVATE_KEY).toString();
+    } else {
+        hashDigest = HmacSHA1(`Version=1.0&agent=wx&nonce=${nonce}&timestamp=${timestamp}`, config.PRIVATE_KEY).toString();
+    }
     const sign = Base64.stringify(utf8.parse(hashDigest));
     // 接口前缀
     _params.url = config.BASE_URL + _params.url;
     // 所有接口后面添加统一参数
     // agent设备类型，nonce随机数，5位数字，timestamp时间戳，sign接口签名
-    _params.url += `?Version=1.0
+    _params.url += `?Version=1.0`;
+    // 是否需要添加access_token
+    if (_params.data.access_token) {
+        _params.url += `&access_token=${_params.data.access_token}`;
+        delete _params.data.access_token;
+    }
+    _params.url += `&sign=${sign}
                         &agent=wx
                         &nonce=${nonce}
-                        &timestamp=${timestamp}
-                        &sign=${sign}`;
+                        &timestamp=${timestamp}`;
     _params.url = _params.url.replace(/\s*|\n*/g, '');
 
     // 判断是否是post请求，如果是，需要使用Qs转换请求参数
@@ -65,9 +76,6 @@ axios.interceptors.response.use((response) => {
 
 export default {
     install(vue, name = 'http') {
-        // Object.defineProperty(Vue.prototype, name, {
-        //     value: axios
-        // });
         vue[name] = axios;
     }
 };

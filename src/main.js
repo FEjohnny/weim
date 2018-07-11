@@ -16,10 +16,19 @@ import router from './router';
 es6Promise.polyfill();
 
 Vue.use(httpPlugin);
-// Vue.use(Loadmore);
 Vue.component(Loadmore.name, Loadmore);
 
 Vue.config.productionTip = false;
+
+// 在查看聊天历史记录页面刷新，强制返回到首页，不然会导致登录信息无效
+router.beforeEach((to, from, next) => {
+    window.addEventListener('load', function () {
+        if (to.name === 'History') {
+            window.history.back();
+        }
+    });
+    next();
+});
 
 /* eslint-disable no-new */
 new Vue({

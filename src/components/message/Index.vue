@@ -10,24 +10,42 @@
                 <span>{{ msg.showTime }}</span>
             </div>
             <!--消息时间end-->
-            <div>
+            <!--展示商品 属于本地添加的一个消息体start-->
+            <div v-if="msg.type === 'customGoods' " class="show-good-wrap">
+                <img class="goods-img" :src="msg.content.goodsImageUrl" alt="商品图片">
+                <p class="name">{{msg.content.goodsName}}</p>
+                <p class="price"><span>￥</span>{{msg.content.goodsPrice}}</p>
+                <p class="send-good-btn"><span @click="handleSendGoodsMsg">发送商品</span></p>
+            </div>
+            <!--展示商品 属于本地添加的一个消息体end-->
+            <div v-else>
                 <!--头像start-->
                 <img v-if="msg.isSend"
                      :src="loginInfo.headurl"
-                     onerror="this.src='https://www.jobchat.cn/static/home/images/icon_custom_default.png'"
                      class="head" alt="头像">
                 <img v-else
                      :src="loginInfo.Seller_logo"
-                     onerror="this.src='https://www.jobchat.cn/static/home/images/icon_custom_default.png'"
                      class="head" alt="头像">
                 <!--头像start-->
                 <!--消息内容start-->
-                <div class="msg" :class="{msgImg:msg.type == typeImage}">
+                <div class="msg"
+                     :class="{msgImg:msg.type == typeImage,goods:msg.type == typeCustom}">
                     <span v-if="msg.type == typeText"
                           v-html="convertTextMsgToHtml(msg.content)"></span>
-                    <span v-else
+                    <span v-else-if="msg.type == typeImage"
                           @click="viewHdPic((msg.content.getImage(imageLarge)).getUrl())"
                           v-html="convertImageMsgToHtml(msg.content)"></span>
+                    <a v-else-if="msg.type == typeCustom"
+                       :href="convertGoodsMsg(msg.content, 'oringinUrl')"
+                       class="goods-wrap">
+                        <img class="goods-img"
+                             :src="convertGoodsMsg(msg.content, 'goodsImageUrl')"
+                             alt="商品图片">
+                        <span class="name">{{convertGoodsMsg(msg.content, 'goodsName')}}</span>
+                        <span class="price">
+                            <span>￥</span>{{convertGoodsMsg(msg.content, 'goodsPrice')}}
+                        </span>
+                    </a>
                 </div>
                 <!--消息内容end-->
                 <!--发送新消息的发送中状态-->
@@ -40,21 +58,19 @@
         </div>
         <!--上传图片start-->
         <div class="item own" v-if="uploadOptions.size > 0">
-            <img :src="loginInfo.headurl"
-                 onerror="this.src='https://www.jobchat.cn/static/home/images/icon_custom_default.png'"
-                 class="head" alt="头像">
+            <img :src="loginInfo.headurl" class="head" alt="头像">
             <!--消息内容start-->
             <div class="msg msgImg upload-item">
                 <span class="upload-state">
                     <i>{{uploadOptions.progress}}</i>
-                    <span :style="{height:uploadOptions.progress}"></span>
-                    <img src="../../assets/img_default.jpg">
+                    <span class="float" :style="{height:uploadOptions.progress}"></span>
+                    <span class="default-img"></span>
                 </span>
             </div>
         </div>
         <!--上传图片end-->
         <!--图片预览start-->
-        <div class="img-preview" v-show="imgPreviewUrl" @click="hidePreview">
+        <div class="img-preview" :class="{show:imgPreviewUrl}" @click="hidePreview">
             <div>
                 <img :src="imgPreviewUrl" alt="">
             </div>
@@ -76,6 +92,7 @@
             return {
                 typeImage: webim.MSG_ELEMENT_TYPE.IMAGE,
                 typeText: webim.MSG_ELEMENT_TYPE.TEXT,
+                typeCustom: webim.MSG_ELEMENT_TYPE.CUSTOM,
                 imageLarge: webim.IMAGE_TYPE.LARGE,
                 imgPreviewUrl: ''
             };
@@ -84,7 +101,15 @@
             ...mapState('chat', ['loginInfo', 'uploadOptions'])
         },
         methods: {
-            ...mapActions('chat', ['sendMessage']),
+            ...mapActions('chat', ['sendMessage', 'sendGoodsMsg']),
+            // 发送商品消息
+            handleSendGoodsMsg() {
+                this.sendGoodsMsg();
+                setTimeout(() => {
+                    document.documentElement.scrollTop = 9999999;
+                    document.body.scrollTop = 9999999;
+                }, 300);
+            },
             // 重新发送消息
             sendMsgAgain(msg) {
                 this.sendMessage({ message: msg });
@@ -92,6 +117,21 @@
                     document.documentElement.scrollTop = 9999999;
                     document.body.scrollTop = 9999999;
                 }, 300);
+            },
+            // 解析自定义商品消息
+            convertGoodsMsg(content, parse) {
+                let data;
+                if (content.getData()) {
+                    data = JSON.parse(content.getData());
+                } else {
+                    return '';
+                }
+                if (data[parse]) {
+                    return data[parse];
+                } else if (data.Body && data.Body[parse]) {
+                    return data.Body[parse];
+                }
+                return '';
             },
             // 解析文本消息，表情元素
             convertTextMsgToHtml(content) {
@@ -135,10 +175,12 @@
                 return `<img src="${smallImage.getUrl()}#${bigImage.getUrl()}#${oriImage.getUrl()}"
                         style="${_style}" />`;
             },
+            // 预览图片
             viewHdPic(url) {
                 this.imgPreviewUrl = url;
                 document.body.style.overflow = 'hidden';
             },
+            // 取消预览图片
             hidePreview() {
                 this.imgPreviewUrl = '';
                 document.body.style.overflow = 'auto';
@@ -200,8 +242,18 @@
             border-radius: 16px;
             position: relative;
             line-height: 45px;
+            transition: left 200ms, right 200ms;
             &.upload-item{
                 padding: 6px;
+            }
+            &.goods{
+                background: #ffffff!important;
+                &:before {
+                    border-left: 12px solid #ffffff!important;
+                    border-right: 0px solid #ffffff!important;
+                    border-top: 14px solid transparent;
+                    border-bottom: 14px solid transparent;
+                }
             }
             &:before {
                 content: '';
@@ -235,6 +287,36 @@
             span{
                 display: block;
                 max-width: 100%;
+            }
+            .goods-wrap{
+                position: relative;
+                display: block;
+                padding-left: 135px;
+                text-decoration: none;
+                .goods-img{
+                    width: 120px;
+                    height: 120px;
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                }
+                .name{
+                    font-size: 28px;
+                    color: #2E2E2E;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    padding-bottom: 36px;
+                }
+                .price{
+                    display: inline;
+                    font-size: 36px;
+                    color: #FF6A00;
+                    span{
+                        display: inline;
+                        font-size: 24px;
+                    }
+                }
             }
         }
         &.own {
@@ -302,7 +384,7 @@
         line-height: 1em;
         z-index: 0;
         &:before{
-            content: '图片上传中...';
+            content: '上传中';
             zoom: 1;
             position: absolute;
             z-index: 12;
@@ -318,7 +400,7 @@
             font-style: normal;
             transform: translate(-50%,-50%);
         }
-        span{
+        .float{
             content: '';
             zoom: 1;
             position: absolute;
@@ -329,10 +411,17 @@
             background: rgba(0,0,0,.7);
             z-index: 11;
         }
-        img{
-            width: 300px;
-            height: auto;
-            min-height: 200px;
+        .default-img{
+            display: block;
+            width: 200px;
+            height: 300px;
+        }
+    }
+    @keyframes handleScale {
+        from {
+            transform: scale(0,0);
+        } to {
+            transform: scale(1,1);
         }
     }
     .img-preview{
@@ -348,6 +437,12 @@
         justify-items: center;
         display: flex;
         flex-direction: column;
+        transition: transform 200ms;
+        transform: scale(0,0);
+        transform-origin: 50% 50%;
+        &.show{
+            transform: scale(1,1);
+        }
         div{
             text-align: center;
             img{
@@ -356,6 +451,45 @@
                 flex-grow: 1;
                 max-width: 100%;
                 max-height: 100%;
+            }
+        }
+    }
+    .show-good-wrap{
+        padding: 24px 24px 24px 168px;
+        box-sizing: border-box;
+        position: relative;
+        background: #ffffff;
+        .goods-img{
+            width: 120px;
+            height: 120px;
+            position: absolute;
+            top: 24px;
+            left: 24px;
+        }
+        .name{
+            font-size: 28px;
+            color: #394043;
+            letter-spacing: 0.5px;
+            line-height: 34px;
+            height: 68px;
+            overflow: hidden;
+        }
+        .price{
+            margin: 20px 0 30px;
+            font-size: 36px;
+            color: #FF6A00;
+            line-height: 36px;
+        }
+        .send-good-btn{
+            text-align: center;
+            span{
+                font-size: 28px;
+                color: #FF6A00;
+                line-height: 56px;
+                display: inline-block;
+                border: 2px solid #FF6A00;
+                border-radius: 8px;
+                padding: 0 55px;
             }
         }
     }

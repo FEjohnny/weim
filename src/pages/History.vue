@@ -24,7 +24,7 @@
 </template>
 
 <script>
-    import { mapState } from 'vuex';
+    import { mapActions, mapState } from 'vuex';
     import Message from '@/components/message';
 
     export default {
@@ -38,37 +38,33 @@
         components: {
             Message
         },
+        created() {},
         computed: {
-            ...mapState('chat', ['historyMessagesLists'])
+            ...mapState('chat', ['wxInfo', 'historyMessagesLists'])
         },
         methods: {
+            ...mapActions('chat', ['getHistoryMessagesFromIdouzi']),
             // 获取爱豆子服务器存储的聊天记录，一般是超过7天的
             getHistoryMessages() {
                 const _this = this;
                 // 加载更多数据 是否还有更多
-                this.$refs.loadmore.onTopLoaded();
                 if (!_this.allLoaded) {
-                    this.getLastC2CHistoryMsgs().then((res) => {
-                        // 是否还有历史消息可以拉取，1-表示没有，0-表示有
-                        const complete = res.Complete;
-                        // 返回的消息条数，小于或等于请求的消息条数，小于的时候，说明没有历史消息可拉取了
-                        // const retMsgCount = res.MsgCount;
-                        if (complete === 1) {
-                            _this.allLoaded = true;
-                        }
+                    this.getHistoryMessagesFromIdouzi().then((res) => {
                         _this.$refs.loadmore.onTopLoaded();
                         let preEle;
                         let scrollTop;
+                        if (res.msgLists.length === 0) {
+                            _this.allLoaded = true;
+                        }
                         if (res.scrollTop && res.preId) { // 拉去历史记录后，保持滚动条的位置
                             preEle = document.getElementById(res.preId);
                             scrollTop = preEle.offsetTop - ((Number(document.documentElement.style.fontSize.replace('px', '')) / 75) * 32);
                             document.documentElement.scrollTop = scrollTop;
                             document.body.scrollTop = scrollTop;
-                        } else if (res.scrollDown && res.preId) { // 首次历史消息，滚到底部
-                            _this.scrollTopBottom();
                         }
                     }).catch((err) => {
-                        console.log(`拉取历史消息出错:${err.ErrorInfo}`);
+                        this.$refs.loadmore.onTopLoaded();
+                        alert(`拉取历史消息出错:${err}`);
                     });
                 } else {
                     this.$refs.loadmore.onTopLoaded();

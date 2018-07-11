@@ -1,9 +1,8 @@
 <template>
     <div class="chat-container">
         <!--展示消息-->
-        <div class="messages-wrap"
-             ref="scrollContainer"
-             @click="handleFocus">
+        <div class="messages-wrap" ref="scrollContainer" @click="handleFocus">
+            <!--下滑加载更多组件-->
             <mt-loadmore
                 :top-method="getHistoryMessages"
                 :top-all-loaded="allLoaded"
@@ -14,10 +13,9 @@
                 @top-status-change="handleTopChange"
                 ref="loadmore">
                 <!--查看更多历史记录按钮，从腾讯IM加载不到消息就显示这个按钮-->
-                <router-link
-                     v-if="messagesLists.length > 0 && allLoaded"
-                     to="/history"
-                     class="more-messages">查看更多历史记录</router-link>
+                <div class="more-messages-wrap" v-if="messagesLists.length > 0 && allLoaded">
+                    <router-link to="/history" class="more-messages">查看更多消息</router-link>
+                </div>
                 <!--消息start-->
                 <Message :messagesLists="messagesLists"></Message>
                 <!--消息end-->
@@ -105,7 +103,8 @@
     import { swiper, swiperSlide } from 'vue-awesome-swiper';
     import Message from '@/components/message';
     import LoadingPage from '@/components/LoadingPage';
-    import emotionJson from '../emotions/name_to_face_normal';
+    import emotionJson from '@/emotions/name_to_face_normal';
+    import analysisUrlParams from '@/util/analysisUrlParams';
 
     export default {
         name: 'Index',
@@ -128,6 +127,9 @@
         },
         created() {
             const vm = this;
+            // 读取url参数
+            const _wxinfo = analysisUrlParams(decodeURIComponent(window.location.href));
+            vm.setWxInfo(_wxinfo);
             // 获取用户信息
             this.loadingText = '连接客服中...';
             this.getIdentifierToken().then(() => {
@@ -146,31 +148,13 @@
                     this.loadingText = '获取历史聊天记录中...';
                     vm.getHistoryMessages();
                 }).catch((err) => {
-                    this.loadingText = '登录失败';
-                    alert(`登录IM服务器失败：${err.ErrorInfo}`);
+                    this.loadingText = `登录失败：${err.ErrorInfo}`;
                 });
             }).catch((err) => {
-                this.loadingText = '获取token失败';
-                alert(`获取token失败：${err.ErrorInfo}`);
+                this.loadingText = `获取token失败:${err}`;
             });
             // 解析表情元素
-            const _tempEmotions = [];
-            const EACHPAGEMAX = 23; // 每页最多显示的表情数24
-            let _emotions = [];
-            Object.keys(emotionJson).forEach((item) => {
-                if (_emotions.length < EACHPAGEMAX) {
-                    let emotionPicName = emotionJson[item].split('.')[0];
-                    if (/@/.test(emotionPicName)) {
-                        emotionPicName = emotionPicName.split('@')[0];
-                    }
-                    _emotions.push([item, emotionPicName]);
-                } else {
-                    _emotions.push(['删除', 'emotion_del_normal']);
-                    _tempEmotions.push(_emotions);
-                    _emotions = [];
-                }
-            });
-            this.emotions = _tempEmotions;
+            this.setEmotions();
         },
         mounted() {},
         components: {
@@ -184,6 +168,8 @@
         },
         methods: {
             ...mapActions('chat', [
+                'setGoodsInfo',
+                'setWxInfo',
                 'getIdentifierToken',
                 'loginIm',
                 'onConnNotify',
@@ -198,6 +184,26 @@
                 'onMsgReadedNotify',
                 'onKickedEventCall'
             ]),
+            // 解析表情元素
+            setEmotions() {
+                const _tempEmotions = [];
+                const EACHPAGEMAX = 23; // 每页最多显示的表情数24
+                let _emotions = [];
+                Object.keys(emotionJson).forEach((item) => {
+                    if (_emotions.length < EACHPAGEMAX) {
+                        let emotionPicName = emotionJson[item].split('.')[0];
+                        if (/@/.test(emotionPicName)) {
+                            emotionPicName = emotionPicName.split('@')[0];
+                        }
+                        _emotions.push([item, emotionPicName]);
+                    } else {
+                        _emotions.push(['删除', 'emotion_del_normal']);
+                        _tempEmotions.push(_emotions);
+                        _emotions = [];
+                    }
+                });
+                this.emotions = _tempEmotions;
+            },
             // 监听新消息
             onMessageNotify(newMsgList) {
                 this.onMsgNotify(newMsgList);
@@ -215,7 +221,7 @@
                 } else if (!/image.(png|jpg|jpeg|bmp)/.test(file.type)) {
                     alert('图片格式错误');
                     return;
-                } else if (file.size > 10 * 1024 * 1024) { // 图片不能大于1M
+                } else if (file.size > 5 * 1024 * 1024) { // 图片不能大于1M
                     alert('图片大小不能大于5M');
                     return;
                 }
@@ -261,7 +267,7 @@
                 this.sendMessage({ message: msg });
                 setTimeout(() => {
                     this.scrollTopBottom();
-                }, 300);
+                }, 200);
             },
             // 滚动到页面底部通用方法
             scrollTopBottom() {
@@ -308,15 +314,25 @@
                             document.documentElement.scrollTop = scrollTop;
                             document.body.scrollTop = scrollTop;
                         } else if (res.scrollDown && res.preId) { // 首次历史消息，滚到底部
-                            _this.scrollTopBottom();
+                            if (_this.wxInfo.goodsId) { // 是否有商品信息带过来
+                                _this.doSetGoodsInfo(); // 设置商品信息
+                            }
+                            setTimeout(() => {
+                                _this.scrollTopBottom();
+                            }, 0);
                         }
                     }).catch((err) => {
+                        this.loadingText = `拉取历史消息出错:${err.ErrorInfo}`;
                         console.log(`拉取历史消息出错:${err.ErrorInfo}`);
                     });
                 } else {
                     this.loadingText = '';
                     this.$refs.loadmore.onTopLoaded();
                 }
+            },
+            // 设置商品信息
+            doSetGoodsInfo() {
+                this.setGoodsInfo();
             },
             handleTopChange(status) {
                 this.topStatus = status;
@@ -459,13 +475,20 @@
             }
         }
     }
-    .more-messages{
-        text-decoration: none;
-        display: block;
+    .more-messages-wrap{
         text-align: center;
-        padding: 30px 0 10px;
-        font-size: 28px;
-        color: #008AFF;
+        .more-messages{
+            text-decoration: none;
+            display: inline-block;
+            border: 2px solid #008AFF;
+            border-radius: 8px;
+            margin: 32px auto 0;
+            text-align: center;
+            padding: 8px 55px;
+            font-size: 28px;
+            color: #008AFF;
+            line-height: 40px;
+        }
     }
     .icon_down{
         transition: transform 0.2s;

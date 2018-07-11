@@ -32,4 +32,13 @@ export const UPDATE_UPLOAD_IMG_UPLOADED = 'UPDATE_UPLOAD_IMG_UPLOADED';
 // 上传图片状态更新,预览图片地址
 export const UPDATE_UPLOAD_IMG_URL = 'UPDATE_UPLOAD_IMG_URL';
 
+// 设置来源链接带过来的信息
+export const SET_WXINFO = 'SET_WXINFO';
+
+// 设置商品信息
+export const SET_GOODS_INFO = 'SET_GOODS_INFO';
+
+// 拉取历史消息，unshift到历史消息列表中,消息历史页面使用
+export const APPEND_HISTORY_MESSAGES_INTO_HISTORY_LISTS = 'APPEND_HISTORY_MESSAGES_INTO_HISTORY_LISTS';
+
 export default null;
