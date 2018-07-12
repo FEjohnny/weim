@@ -44,7 +44,7 @@
         },
         methods: {
             ...mapActions('chat', ['getHistoryMessagesFromIdouzi']),
-            // 获取爱豆子服务器存储的聊天记录，一般是超过7天的
+            // 获取乐运营服务器存储的聊天记录，一般是超过7天的
             getHistoryMessages() {
                 const _this = this;
                 // 加载更多数据 是否还有更多

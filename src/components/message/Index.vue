@@ -112,7 +112,11 @@
             },
             // 重新发送消息
             sendMsgAgain(msg) {
-                this.sendMessage({ message: msg });
+                if (msg.type === 'TIMCustomElem') {
+                    this.sendGoodsMsg(msg);
+                } else {
+                    this.sendMessage({ message: msg });
+                }
                 setTimeout(() => {
                     document.documentElement.scrollTop = 9999999;
                     document.body.scrollTop = 9999999;
@@ -139,11 +143,13 @@
                 const matches = html.match(/\[[^\]]+\]/g);
                 if (matches && matches.length > 0) {
                     for (let i = 0; i < matches.length; i += 1) {
-                        let name = emotionsToImg[matches[i]].split('.')[0];
-                        if (/@/.test(name)) {
-                            name = name.split('@')[0];
+                        if (emotionsToImg[matches[i]]) {
+                            let name = emotionsToImg[matches[i]].split('.')[0];
+                            if (/@/.test(name)) {
+                                name = name.split('@')[0];
+                            }
+                            html = html.replace(matches[i], `<i class="icon_emotion emotion_${name}" ></i>`);
                         }
-                        html = html.replace(matches[i], `<i class="icon_emotion emotion_${name}" ></i>`);
                     }
                 }
                 return html;

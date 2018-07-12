@@ -153,10 +153,10 @@ export default {
         // 获取会话双方的identifier和token信息
         getIdentifierToken({ commit, state }) {
             return new Promise((resolve, reject) => {
-                const { openId, mallId } = state.wxInfo;
-                Vue.http.post(config.REQUEST_IDENTIFIER_TOKEN, {
-                    openId, mallId
-                }).then((loginInfo) => {
+                const params = {};
+                params.openId = document.getElementById('openId').value === '<?=$openId ?>' ? 'okmGDuIEV-HYe0uF_xD4SoQLoomc' : document.getElementById('openId').value;
+                params.mallId = state.wxInfo.mallId;
+                Vue.http.post(config.REQUEST_IDENTIFIER_TOKEN, params).then((loginInfo) => {
                     // 更新会话双方的信息和token信息
                     commit(types.UPDATE_LOGIN_INFO, loginInfo);
                     console.log('获取会话双方的identifier和token信息');
@@ -258,13 +258,12 @@ export default {
             let msgContent;
             // 重新发送消息
             if (typeof message === 'object') {
-                msgContent = message.content;
+                msgContent = message.content.getText();
                 // 本地删除之前发送失败的消息
                 commit(types.DELETE_MSG_SEND_FAILED, message);
             } else {
                 msgContent = message;
             }
-
             if (!state.loginInfo.Seller_identifier) {
                 alert('你还没有选中好友或者群组，暂不能聊天');
                 return;
@@ -434,10 +433,14 @@ export default {
             });
         },
         // 发送商品消息
-        sendGoodsMsg({ commit, state }) {
+        sendGoodsMsg({ commit, state }, message) {
             if (!state.loginInfo.Seller_identifier) {
                 alert('你还没有选中好友或者群组，暂不能聊天');
                 return;
+            }
+            if (message) {
+                // 本地删除之前发送失败的消息
+                commit(types.DELETE_MSG_SEND_FAILED, message);
             }
             const selType = 'C2C';
             const selSess = new webim.Session(
