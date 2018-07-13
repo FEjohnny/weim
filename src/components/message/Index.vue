@@ -36,7 +36,7 @@
                           @click="viewHdPic((msg.content.getImage(imageLarge)).getUrl())"
                           v-html="convertImageMsgToHtml(msg.content)"></span>
                     <a v-else-if="msg.type == typeCustom"
-                       :href="convertGoodsMsg(msg.content, 'oringinUrl')"
+                       :href="`${convertGoodsMsg(msg.content, 'oringinUrl')}?mallId=${convertGoodsMsg(msg.content, 'mallId')}&goodsId=${convertGoodsMsg(msg.content, 'goodsId')}`"
                        class="goods-wrap">
                         <img class="goods-img"
                              :src="convertGoodsMsg(msg.content, 'goodsImageUrl')"
